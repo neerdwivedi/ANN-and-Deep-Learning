@@ -122,3 +122,7 @@ Before training, the model behaves randomly because it has no knowledge of the p
 ## Short Summary
 
 This lab uses TensorFlow to build a small neural network with one hidden layer to learn the AND gate. The model starts with random weights, trains over several epochs using the Adam optimizer, and gradually learns the pattern. The sigmoid output is turned into a 0 or 1 answer using a 0.5 threshold.
+
+
+
+include the applications
