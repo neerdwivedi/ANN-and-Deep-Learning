@@ -1,6 +1,5 @@
 # Lab #6 — Keras MLP for Regression
 
-**Student:** Neer Dwivedi (24215217)
 
 ---
 

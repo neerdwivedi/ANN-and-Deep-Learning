@@ -42,3 +42,20 @@ with torch.no_grad():
     predictions = model(X)
     for i, pred in enumerate(predictions):
         print(f"Input: {X[i].tolist()} => Predicted: {round(float(pred), 4)} => Class: {int(pred >= 0.5)}")
+
+
+# Train the SAME model for more epochs
+for epoch in range(1000):
+    outputs = model(X)
+    loss = criterion(outputs, y)
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+# Predict again after more training
+print("\nPredictions after 1000 more epochs:")
+with torch.no_grad():
+    predictions = model(X)
+    for i, pred in enumerate(predictions):
+        print(f"Input: {X[i].tolist()} => Predicted: {round(float(pred), 4)} => Class: {int(pred >= 0.5)}")

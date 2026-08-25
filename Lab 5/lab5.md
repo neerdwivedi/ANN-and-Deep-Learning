@@ -1,6 +1,5 @@
-# Lab #5 — CNN for Cats vs Dogs (Beginner Report)
+# Lab #5 — CNN for Cats vs Dogs 
 
-**Student:** Neer Dwivedi (24215217)
 
 ---
 
