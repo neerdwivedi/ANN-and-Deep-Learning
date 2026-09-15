@@ -1,181 +1,414 @@
-"""
-Lab #6 - Keras MLP for Regression
-Student: Neer Dwivedi (24215217)
+# ============================================================
+# LAB 6: Keras MLP for Regression
+# Dataset: Salary Dataset
+# ============================================================
 
-Predicts Salary from YearsExperience with a Multi-Layer Perceptron (Keras/TensorFlow),
-comparing activation functions (ReLU, Sigmoid, Tanh) and loss functions (MSE, MAE, Huber).
 
-Run in VS Code:
-    pip install tensorflow scikit-learn pandas matplotlib
-    python lab6_keras_mlp_regression.py
-Keep Salary_dataset.csv in the same folder as this script.
-Plots are shown on screen and also saved as PNG files next to the script.
-"""
+# ============================================================
+# 1. IMPORT LIBRARIES
+# ============================================================
 
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import tensorflow as tf
+
 from tensorflow import keras
 from tensorflow.keras import layers
+
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
+
+# Set random seed for reproducible results
 np.random.seed(42)
 tf.random.set_seed(42)
-HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-# ----------------------------------------------------------------------
-# 1. Load and explore the dataset
-# ----------------------------------------------------------------------
-def load_data():
-    path = os.path.join(HERE, "Salary_dataset.csv")
-    df = pd.read_csv(path, index_col=0)
-    print("Shape:", df.shape)
-    print(df.describe())
-    print("\nMissing values per column:\n", df.isna().sum())
-    return df
+# ============================================================
+# 2. LOAD DATASET
+# ============================================================
+
+# Get the folder where this Python file is located
+current_folder = os.path.dirname(os.path.abspath(__file__))
+
+# Dataset is inside the "dataset" folder
+dataset_path = os.path.join(
+    current_folder,
+    "dataset",
+    "Salary_dataset.csv"
+)
+
+df = pd.read_csv(dataset_path)
+
+# Remove unnecessary index column if present
+if "Unnamed: 0" in df.columns:
+    df = df.drop(columns=["Unnamed: 0"])
 
 
-# ----------------------------------------------------------------------
-# 2. Preprocess: scale X and y, split train/test
-# ----------------------------------------------------------------------
-def preprocess(df):
-    X = df[["YearsExperience"]].values
-    y = df[["Salary"]].values
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
-    x_scaler = StandardScaler().fit(X_train)
-    y_scaler = StandardScaler().fit(y_train)
-    data = {
-        "X_train_s": x_scaler.transform(X_train),
-        "X_test_s": x_scaler.transform(X_test),
-        "y_train_s": y_scaler.transform(y_train),
-        "y_test": y_test,
-        "y_scaler": y_scaler,
-    }
-    print(f"\nTrain: {data['X_train_s'].shape}  Test: {data['X_test_s'].shape}")
-    return data
+print("First 5 rows:")
+print(df.head())
+
+print("\nShape of dataset:")
+print(df.shape)
+
+print("\nMissing values:")
+print(df.isnull().sum())
+
+print("\nSummary statistics:")
+print(df.describe())
 
 
-# ----------------------------------------------------------------------
-# 3. MLP: input -> Dense(32) -> Dense(16) -> linear output
-# ----------------------------------------------------------------------
-def build_model(activation, loss):
+# ============================================================
+# 3. VISUALIZE THE DATA
+# ============================================================
+
+plt.scatter(df["YearsExperience"], df["Salary"])
+
+plt.xlabel("Years of Experience")
+plt.ylabel("Salary")
+plt.title("Years of Experience vs Salary")
+
+plt.show()
+
+
+# ============================================================
+# 4. DEFINE INPUT AND TARGET
+# ============================================================
+
+# Input feature
+X = df[["YearsExperience"]].values
+
+# Target variable
+y = df[["Salary"]].values
+
+
+# ============================================================
+# 5. SPLIT DATA INTO TRAINING AND TESTING SETS
+# ============================================================
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42
+)
+
+print("\nTraining samples:", len(X_train))
+print("Testing samples:", len(X_test))
+
+
+# ============================================================
+# 6. SCALE THE DATA
+# ============================================================
+
+x_scaler = StandardScaler()
+y_scaler = StandardScaler()
+
+# Fit scaler only on training data
+X_train_scaled = x_scaler.fit_transform(X_train)
+X_test_scaled = x_scaler.transform(X_test)
+
+y_train_scaled = y_scaler.fit_transform(y_train)
+
+
+# ============================================================
+# 7. CREATE THE MLP MODEL
+# ============================================================
+
+def create_model(activation="relu", loss="mse"):
+
     model = keras.Sequential([
+        # Input layer
         keras.Input(shape=(1,)),
+
+        # First hidden layer
         layers.Dense(32, activation=activation),
+
+        # Second hidden layer
         layers.Dense(16, activation=activation),
-        layers.Dense(1, activation="linear"),
+
+        # Output layer
+        # Linear activation is used for regression
+        layers.Dense(1, activation="linear")
     ])
-    model.compile(optimizer=keras.optimizers.Adam(0.01), loss=loss)
+
+    model.compile(
+        optimizer=keras.optimizers.Adam(learning_rate=0.01),
+        loss=loss
+    )
+
     return model
 
 
-def train(activation, loss, label, data):
+# ============================================================
+# 8. FUNCTION TO TRAIN AND EVALUATE MODEL
+# ============================================================
+
+def train_model(activation, loss):
+
+    # Reset random seed so comparisons are fair
     tf.keras.utils.set_random_seed(42)
-    model = build_model(activation, loss)
+
+    model = create_model(
+        activation=activation,
+        loss=loss
+    )
+
     history = model.fit(
-        data["X_train_s"], data["y_train_s"],
-        validation_split=0.2, epochs=200, batch_size=8, verbose=0,
+        X_train_scaled,
+        y_train_scaled,
+
+        # 20% of training data is used for validation
+        validation_split=0.2,
+
+        epochs=200,
+        batch_size=8,
+        verbose=0
     )
-    pred = data["y_scaler"].inverse_transform(
-        model.predict(data["X_test_s"], verbose=0)
+
+    # Predict scaled salary values
+    y_pred_scaled = model.predict(
+        X_test_scaled,
+        verbose=0
     )
-    mse = mean_squared_error(data["y_test"], pred)
-    result = {
-        "label": label,
-        "activation": activation,
-        "loss": loss if isinstance(loss, str) else "huber",
-        "MAE": mean_absolute_error(data["y_test"], pred),
-        "RMSE": float(np.sqrt(mse)),
-        "MSE": float(mse),
-        "R2": r2_score(data["y_test"], pred),
-        "history": history.history,
-    }
-    print(f"{label:16s}  MAE={result['MAE']:9.1f}  "
-          f"RMSE={result['RMSE']:9.1f}  R2={result['R2']:.4f}")
-    return result
+
+    # Convert predictions back to actual salary values
+    y_pred = y_scaler.inverse_transform(y_pred_scaled)
+
+    # Calculate evaluation metrics
+    mae = mean_absolute_error(y_test, y_pred)
+
+    mse = mean_squared_error(y_test, y_pred)
+
+    rmse = np.sqrt(mse)
+
+    r2 = r2_score(y_test, y_pred)
+
+    return model, history, mae, rmse, r2
 
 
-# ----------------------------------------------------------------------
-# 4. Plots
-# ----------------------------------------------------------------------
-def plot_loss_curves(results):
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    for r in results[:3]:  # activation experiment
-        axes[0].plot(r["history"]["val_loss"], label=r["label"])
-    axes[0].set_title("Experiment A - Activations (validation MSE, scaled)")
-    axes[0].set_xlabel("Epoch"); axes[0].set_ylabel("Scaled loss")
-    axes[0].legend(); axes[0].grid(alpha=.3)
+# ============================================================
+# 9. EXPERIMENT 1: ACTIVATION FUNCTIONS
+# ============================================================
+#
+# We change the activation function while keeping
+# the loss function fixed as MSE.
+#
+# ReLU vs Sigmoid vs Tanh
+# ============================================================
 
-    relu_mse = results[0]
-    axes[1].plot(relu_mse["history"]["loss"], label="train")
-    axes[1].plot(relu_mse["history"]["val_loss"], label="val")
-    axes[1].set_title("ReLU + MSE - train vs validation loss")
-    axes[1].set_xlabel("Epoch"); axes[1].set_ylabel("Scaled loss")
-    axes[1].legend(); axes[1].grid(alpha=.3)
-    plt.tight_layout()
-    plt.savefig(os.path.join(HERE, "loss_curves_activations.png"), dpi=120)
+activations = [
+    "relu",
+    "sigmoid",
+    "tanh"
+]
 
-    fig, axes = plt.subplots(1, 3, figsize=(16, 4))
-    for ax, r in zip(axes, [results[0], results[3], results[4]]):
-        ax.plot(r["history"]["loss"], label="train")
-        ax.plot(r["history"]["val_loss"], label="val")
-        ax.set_title(r["label"]); ax.set_xlabel("Epoch")
-        ax.legend(); ax.grid(alpha=.3)
-    plt.tight_layout()
-    plt.savefig(os.path.join(HERE, "loss_curves_losses.png"), dpi=120)
+activation_results = []
+
+activation_histories = {}
+
+
+for activation in activations:
+
+    model, history, mae, rmse, r2 = train_model(
+        activation=activation,
+        loss="mse"
+    )
+
+    activation_histories[activation] = history
+
+    activation_results.append([
+        activation,
+        "MSE",
+        mae,
+        rmse,
+        r2
+    ])
+
+
+# ============================================================
+# 10. ACTIVATION FUNCTION COMPARISON TABLE
+# ============================================================
+
+activation_table = pd.DataFrame(
+    activation_results,
+    columns=[
+        "Activation",
+        "Loss",
+        "MAE",
+        "RMSE",
+        "R2"
+    ]
+)
+
+print("\n======================================")
+print("ACTIVATION FUNCTION COMPARISON")
+print("======================================")
+
+print(activation_table.round(4))
+
+
+# ============================================================
+# 11. PLOT ACTIVATION FUNCTION LOSS CURVES
+# ============================================================
+
+plt.figure(figsize=(8, 5))
+
+
+for activation in activations:
+
+    plt.plot(
+        activation_histories[activation].history["val_loss"],
+        label=activation
+    )
+
+
+plt.xlabel("Epoch")
+plt.ylabel("Validation Loss")
+plt.title("Activation Function Comparison")
+
+plt.legend()
+
+plt.show()
+
+
+# ============================================================
+# 12. EXPERIMENT 2: LOSS FUNCTIONS
+# ============================================================
+#
+# Here activation is kept fixed as ReLU.
+#
+# MSE vs MAE vs Huber
+# ============================================================
+
+losses = {
+    "MSE": "mse",
+    "MAE": "mae",
+    "Huber": keras.losses.Huber()
+}
+
+
+loss_results = []
+
+loss_histories = {}
+
+
+for loss_name, loss_function in losses.items():
+
+    model, history, mae, rmse, r2 = train_model(
+        activation="relu",
+        loss=loss_function
+    )
+
+    loss_histories[loss_name] = history
+
+    loss_results.append([
+        "ReLU",
+        loss_name,
+        mae,
+        rmse,
+        r2
+    ])
+
+
+# ============================================================
+# 13. LOSS FUNCTION COMPARISON TABLE
+# ============================================================
+
+loss_table = pd.DataFrame(
+    loss_results,
+    columns=[
+        "Activation",
+        "Loss",
+        "MAE",
+        "RMSE",
+        "R2"
+    ]
+)
+
+
+print("\n======================================")
+print("LOSS FUNCTION COMPARISON")
+print("======================================")
+
+print(loss_table.round(4))
+
+
+# ============================================================
+# 14. PLOT TRAINING AND VALIDATION LOSS
+# ============================================================
+
+for loss_name in losses:
+
+    plt.figure(figsize=(7, 4))
+
+    # Training loss
+    plt.plot(
+        loss_histories[loss_name].history["loss"],
+        label="Training Loss"
+    )
+
+    # Validation loss
+    plt.plot(
+        loss_histories[loss_name].history["val_loss"],
+        label="Validation Loss"
+    )
+
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+
+    plt.title(
+        "ReLU + " + loss_name
+    )
+
+    plt.legend()
+
     plt.show()
 
 
-# ----------------------------------------------------------------------
-# 5. Main
-# ----------------------------------------------------------------------
-def main():
-    print("TensorFlow", tf.__version__)
-    df = load_data()
-    data = preprocess(df)
+# ============================================================
+# 15. FINAL COMPARISON TABLE
+# ============================================================
 
-    results = []
-    # Experiment A: activation functions, loss fixed = MSE
-    results.append(train("relu", "mse", "ReLU + MSE", data))
-    results.append(train("sigmoid", "mse", "Sigmoid + MSE", data))
-    results.append(train("tanh", "mse", "Tanh + MSE", data))
-    # Experiment B: loss functions, activation fixed = ReLU
-    results.append(train("relu", "mae", "ReLU + MAE", data))
-    results.append(train("relu", keras.losses.Huber(delta=1.0), "ReLU + Huber", data))
-
-    # Comparison table (the four models requested by the brief)
-    table = pd.DataFrame([
-        {"Experiment": "Model 1", "Activation": "ReLU", "Loss Function": "MSE",
-         **{k: results[0][k] for k in ("MAE", "RMSE", "R2")}},
-        {"Experiment": "Model 2", "Activation": "Sigmoid", "Loss Function": "MSE",
-         **{k: results[1][k] for k in ("MAE", "RMSE", "R2")}},
-        {"Experiment": "Model 3", "Activation": "Tanh", "Loss Function": "MSE",
-         **{k: results[2][k] for k in ("MAE", "RMSE", "R2")}},
-        {"Experiment": "Model 4", "Activation": "ReLU", "Loss Function": "Huber",
-         **{k: results[4][k] for k in ("MAE", "RMSE", "R2")}},
-    ])
-    table["MAE"] = table["MAE"].round(1)
-    table["RMSE"] = table["RMSE"].round(1)
-    table["R2"] = table["R2"].round(4)
-    print("\n=== Comparison table ===")
-    print(table.to_string(index=False))
-    table.to_csv(os.path.join(HERE, "comparison_table.csv"), index=False)
-
-    best = max(results, key=lambda r: r["R2"])
-    print(f"\nBest model by R2: {best['label']}  "
-          f"(R2={best['R2']:.4f}, RMSE={best['RMSE']:.1f})")
-
-    plot_loss_curves(results)
-    print("\nSaved: loss_curves_activations.png, loss_curves_losses.png, "
-          "comparison_table.csv")
+# Combine activation and loss experiments
+final_table = pd.concat(
+    [
+        activation_table,
+        loss_table
+    ],
+    ignore_index=True
+)
 
 
-if __name__ == "__main__":
-    main()
+# ReLU + MSE exists in both experiments.
+# Remove the duplicate.
+final_table = final_table.drop_duplicates(
+    subset=["Activation", "Loss"]
+)
+
+
+print("\n======================================")
+print("FINAL MODEL COMPARISON")
+print("======================================")
+
+print(final_table.round(4))
+
+
+# ============================================================
+# 16. SELECT BEST MODEL
+# ============================================================
+
+# Higher R2 indicates better regression performance
+best_index = final_table["R2"].idxmax()
+
+best_model = final_table.loc[best_index]
+
+
+print("\n======================================")
+print("BEST MODEL")
+print("======================================")
+
+print(best_model)

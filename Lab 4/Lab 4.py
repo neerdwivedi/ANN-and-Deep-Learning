@@ -16,126 +16,181 @@ pipeline is identical: split -> build -> train -> test.
 
 Run it from inside the Newsgroups folder:  python email_sorter.py
 """
-
-import os
-import re
 import numpy as np
 import tensorflow as tf
+
+from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
 
-# The folder holding the .txt files (defaults to wherever this script lives)
-DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# The 4 topic files we'll use, and a friendly name for each
-CATEGORIES = {
-    "comp.graphics.txt":    "Tech",
-    "misc.forsale.txt":     "For sale",
-    "rec.sport.hockey.txt": "Sports",
-    "sci.space.txt":        "Science",
-}
-CLASS_NAMES = list(CATEGORIES.values())        # ['Tech', 'For sale', 'Sports', 'Science']
+# For similar results each time
+np.random.seed(42)
+tf.random.set_seed(42)
 
 
-# ---------------------------------------------------------------------------
-# STEP 1 - THE LOADER
-# Each .txt file holds MANY messages stacked together; every message starts with a
-# line "Newsgroup: ...". We split on that to get individual messages, then drop the
-# header block (everything up to the first blank line) so the model reads the actual
-# message text, not giveaway header fields.
-# ---------------------------------------------------------------------------
-def load_messages(path):
-    text = open(path, encoding="latin-1").read()
-    chunks = re.split(r"(?m)^Newsgroup:\s", text)      # split into separate messages
-    messages = []
-    for chunk in chunks:
-        if not chunk.strip():
-            continue
-        body = re.sub(r"(?s)^.*?\n\n", "", chunk, count=1)   # remove the header block
-        if body.strip():
-            messages.append(body)
-    return messages
+
+# 1. LOAD DATASET
+
+categories = [
+    "comp.graphics",
+    "misc.forsale",
+    "rec.sport.hockey",
+    "sci.space"
+]
+
+class_names = [
+    "Tech",
+    "For Sale",
+    "Sports",
+    "Science"
+]
 
 
-texts, labels = [], []
-for label_index, (filename, friendly) in enumerate(CATEGORIES.items()):
-    msgs = load_messages(os.path.join(DATA_DIR, filename))
-    texts.extend(msgs)
-    labels.extend([label_index] * len(msgs))           # this topic's number, repeated
-    print(f"Loaded {len(msgs):5d} messages for '{friendly}'  ({filename})")
-
-labels = np.array(labels)
-print(f"\nTotal messages: {len(texts)}")
-
-
-# ---------------------------------------------------------------------------
-# STEP 2 - TURN WORDS INTO NUMBERS (the new part)
-# TfidfVectorizer looks at all the messages and picks the 2000 most useful words,
-# then turns each message into 2000 numbers: how strongly each of those words appears.
-# 'stop_words' throws away filler like "the", "and". That row of 2000 numbers is what
-# the network actually sees -- exactly like the 4 numbers per Iris flower, just more.
-# ---------------------------------------------------------------------------
-vectorizer = TfidfVectorizer(max_features=2000, stop_words="english")
-X = vectorizer.fit_transform(texts).toarray()          # shape: (num_messages, 2000)
-print("Each message is now", X.shape[1], "numbers.")
-
-
-# ---------------------------------------------------------------------------
-# STEP 3 - SPLIT into train (80%) and test (20%) -- same as before
-# ---------------------------------------------------------------------------
-X_train, X_test, y_train, y_test = train_test_split(
-    X, labels, test_size=0.2, random_state=42, stratify=labels
+# Download and load selected categories from 20 Newsgroups
+dataset = fetch_20newsgroups(
+    subset="all",
+    categories=categories,
+    remove=("headers", "footers", "quotes")
 )
-print(f"Train: {len(X_train)} messages    Test: {len(X_test)} messages")
+
+texts = dataset.data
+labels = dataset.target
+
+print("Total messages:", len(texts))
 
 
-# ---------------------------------------------------------------------------
-# STEP 4 - BUILD THE NETWORK
-# 2000 inputs -> hidden layer (64 neurons, ReLU) -> 4 outputs (softmax, one per topic)
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------
+# 2. CONVERT TEXT INTO NUMBERS USING TF-IDF
+# -------------------------------------------------------
+
+vectorizer = TfidfVectorizer(
+    max_features=2000,
+    stop_words="english"
+)
+
+X = vectorizer.fit_transform(texts).toarray()
+
+print("Number of input features:", X.shape[1])
+
+
+# -------------------------------------------------------
+# 3. SPLIT DATA INTO TRAINING AND TESTING
+# -------------------------------------------------------
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    labels,
+    test_size=0.20,
+    random_state=42,
+    stratify=labels
+)
+
+print("Training samples:", len(X_train))
+print("Testing samples:", len(X_test))
+
+
+# -------------------------------------------------------
+# 4. BUILD THE MLP MODEL
+# -------------------------------------------------------
+
 model = tf.keras.Sequential([
-    tf.keras.layers.Input(shape=(2000,)),
+    tf.keras.layers.Input(shape=(X.shape[1],)),
     tf.keras.layers.Dense(64, activation="relu"),
-    tf.keras.layers.Dense(4,  activation="softmax"),
+    tf.keras.layers.Dense(4, activation="softmax")
 ])
+
+
+# -------------------------------------------------------
+# 5. COMPILE THE MODEL
+# -------------------------------------------------------
+
 model.compile(
     optimizer="adam",
     loss="sparse_categorical_crossentropy",
-    metrics=["accuracy"],
+    metrics=["accuracy"]
 )
+
+print("\nModel Summary:")
 model.summary()
 
 
-# ---------------------------------------------------------------------------
-# STEP 5 - TRAIN
-# ---------------------------------------------------------------------------
-model.fit(X_train, y_train, epochs=15, batch_size=32, validation_split=0.1, verbose=1)
+# -------------------------------------------------------
+# 6. TRAIN THE MODEL
+# -------------------------------------------------------
+
+model.fit(
+    X_train,
+    y_train,
+    epochs=10,
+    batch_size=32,
+    validation_split=0.10
+)
 
 
-# ---------------------------------------------------------------------------
-# STEP 6 - TEST AND JUDGE
-# ---------------------------------------------------------------------------
-test_acc = model.evaluate(X_test, y_test, verbose=0)[1]
-print(f"\nTest accuracy: {test_acc:.2%}")
+# -------------------------------------------------------
+# 7. EVALUATE THE MODEL
+# -------------------------------------------------------
 
-y_pred = model.predict(X_test, verbose=0).argmax(axis=1)
-print("\nPer-class report:")
-print(classification_report(y_test, y_pred, target_names=CLASS_NAMES, digits=3))
+test_loss, test_accuracy = model.evaluate(
+    X_test,
+    y_test,
+    verbose=0
+)
 
-print("Confusion matrix (rows = actual, cols = predicted):")
-print(f"{'':<12}" + "".join(f"{n:>10}" for n in CLASS_NAMES))
-for i, row in enumerate(confusion_matrix(y_test, y_pred)):
-    print(f"{CLASS_NAMES[i]:<12}" + "".join(f"{v:>10}" for v in row))
+print(f"\nTest Accuracy: {test_accuracy * 100:.2f}%")
 
 
-# ---------------------------------------------------------------------------
-# STEP 7 - TRY IT ON YOUR OWN MESSAGE
-# ---------------------------------------------------------------------------
-my_message = ["NASA announced a new mission to send a rover to the moon next year."]
-my_numbers = vectorizer.transform(my_message).toarray()    # same word-to-number step
-probs = model.predict(my_numbers, verbose=0)[0]
-print("\nYour test message:", my_message[0])
-for name, p in zip(CLASS_NAMES, probs):
-    print(f"  {name:<10} {p:.1%}")
-print(f"  -> best guess: {CLASS_NAMES[probs.argmax()]}")
+# Predictions
+predictions = model.predict(X_test, verbose=0)
+
+y_pred = np.argmax(predictions, axis=1)
+
+
+# Classification report
+print("\nClassification Report:\n")
+
+print(
+    classification_report(
+        y_test,
+        y_pred,
+        target_names=class_names,
+        digits=3,
+        zero_division=0
+    )
+)
+
+
+# Confusion matrix
+print("Confusion Matrix:\n")
+print(confusion_matrix(y_test, y_pred))
+
+
+# -------------------------------------------------------
+# 8. TEST WITH A NEW MESSAGE
+# -------------------------------------------------------
+
+new_message = [
+    "NASA announced a new mission to send a rover to the moon next year."
+]
+
+new_message_vector = vectorizer.transform(new_message).toarray()
+
+prediction = model.predict(
+    new_message_vector,
+    verbose=0
+)[0]
+
+predicted_class = np.argmax(prediction)
+
+
+print("\nNew Message:")
+print(new_message[0])
+
+print("\nClass Probabilities:")
+
+for class_name, probability in zip(class_names, prediction):
+    print(f"{class_name}: {probability * 100:.2f}%")
+
+print("\nPredicted Class:", class_names[predicted_class])

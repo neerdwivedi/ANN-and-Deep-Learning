@@ -1,162 +1,600 @@
-# Lab #7 — Keras MLP for Multiclass Classification
+# Lab 7 - Keras MLP for Multiclass Classification
 
-**Dataset:** Handwritten Digits (scikit-learn `load_digits`)
-**Task:** Predict which digit (0–9) an 8×8 image represents — a 10-class classification problem.
+## Aim
 
----
-
-## 1. Dataset Description and Source
-
-The dataset is the **Digits** dataset built into scikit-learn (`sklearn.datasets.load_digits`). It is a smaller, cleaner version of the classic handwritten-digit recognition problem.
-
-| Property | Value |
-|---|---|
-| Source | scikit-learn built-in (`load_digits`) |
-| Total samples | 1,797 |
-| Input features | 64 (each image is 8×8 pixels, flattened into 64 numbers) |
-| Pixel value range | 0–16 (grayscale intensity) |
-| Number of classes | 10 (digits 0, 1, 2, … 9) |
-| Missing values | None |
-
-**Why this dataset?** It comfortably satisfies the lab's "three or more classes" rule (it has ten), it needs no download or internet, and — unlike a tiny dataset such as Iris — it has enough samples and enough classes to produce a *meaningful* confusion matrix and clear differences between activation functions and optimizers. That makes the analysis sections of this lab genuinely interesting rather than trivial.
+To implement a Multi-Layer Perceptron (MLP) using TensorFlow/Keras for multiclass classification and compare the effect of different activation functions and optimizers on model performance.
 
 ---
 
-## 2. Problem Definition
+## Dataset
 
-Given the 64 pixel values of an 8×8 grayscale image, the model must output the correct digit label from 0 to 9. Because there are more than two mutually-exclusive classes, this is a **multiclass classification** problem, which is why the output layer uses **softmax** (it turns the network's outputs into 10 probabilities that add up to 1) together with the **categorical cross-entropy** loss.
+I used the **Handwritten Digits dataset** available in scikit-learn using `load_digits()`.
 
----
+The dataset contains small 8 x 8 grayscale images of handwritten digits from 0 to 9.
 
-## 3. Dataset Exploration and Class Distribution
+### Dataset Details
 
-The ten classes are almost perfectly balanced — roughly 180 examples of each digit:
+- Total samples: 1797
+- Number of classes: 10
+- Classes: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+- Input features: 64
+- Image size: 8 x 8 pixels
+- Missing values: 0
 
-| Digit | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Count | 178 | 182 | 177 | 183 | 181 | 182 | 181 | 179 | 174 | 180 |
-
-Because the classes are balanced, **no class-imbalance handling** (such as class weights or resampling) is needed, and it is reasonable to use plain accuracy together with **macro-averaged** precision/recall/F1 (macro-average treats every digit equally).
-
----
-
-## 4. Data Preprocessing (and Justification)
-
-1. **Missing values** — checked; there are none, so nothing to fix.
-2. **Target encoding** — the label is turned into a **one-hot vector** (e.g. `3 → [0,0,0,1,0,0,0,0,0,0]`), which is the format softmax + categorical cross-entropy expects.
-3. **Train/test split** — 80% training / 20% testing, using `stratify` so both sets keep the same class proportions. **The same split is reused by every model** so all comparisons are fair.
-4. **Feature scaling** — `StandardScaler` rescales each of the 64 pixels to mean 0 and standard deviation 1. Neural networks train faster and more stably on standardized inputs. The scaler is **fit only on the training set** and then applied to the test set, so no test information leaks into training.
-
-**Input features:** 64 &nbsp;|&nbsp; **Classes:** 10 &nbsp;|&nbsp; **Training samples:** 1,437 &nbsp;|&nbsp; **Test samples:** 360.
+Each 8 x 8 image is represented using 64 pixel values, which are given as input to the MLP.
 
 ---
 
-## 5. MLP Architecture
+## Class Distribution
 
-| Layer | Neurons | Activation |
-|---|---|---|
-| Input | 64 | — |
-| Hidden layer 1 | 64 | ReLU / Sigmoid / Tanh (varied in Experiment A) |
-| Hidden layer 2 | 32 | same as hidden layer 1 |
-| Output | 10 | **Softmax** |
+The dataset is almost balanced.
 
-**Fixed training settings (kept the same for every model so comparisons are fair):**
+| Digit | Number of Samples |
+|---|---:|
+| 0 | 178 |
+| 1 | 182 |
+| 2 | 177 |
+| 3 | 183 |
+| 4 | 181 |
+| 5 | 182 |
+| 6 | 181 |
+| 7 | 179 |
+| 8 | 174 |
+| 9 | 180 |
 
-- Loss: categorical cross-entropy
-- Epochs: 60
+Since all the classes contain nearly the same number of samples, no special class balancing technique was required.
+
+---
+
+## Data Preprocessing
+
+### 1. Train-Test Split
+
+The dataset was divided into:
+
+- 80% training data
+- 20% testing data
+
+This resulted in:
+
+- Training samples: 1437
+- Testing samples: 360
+
+I used `stratify=y` so that the proportion of each digit remains similar in both training and testing data.
+
+### 2. Feature Scaling
+
+I used `StandardScaler` to scale the 64 input features.
+
+The scaler was fitted only on the training data and then the same scaler was applied to the test data.
+
+Scaling is useful because neural networks generally train more effectively when the input features are on a similar scale.
+
+---
+
+## MLP Architecture
+
+The same basic architecture was used for all experiments so that the comparisons remain fair.
+
+    Input Layer - 64 features
+              |
+    Hidden Layer 1 - 64 neurons
+              |
+    Hidden Layer 2 - 32 neurons
+              |
+    Output Layer - 10 neurons
+              |
+            Softmax
+
+The activation function of the hidden layers was changed according to the experiment.
+
+### Output Layer
+
+The output layer contains 10 neurons because there are 10 possible classes.
+
+I used:
+
+    Softmax
+
+as the output activation function.
+
+Softmax converts the outputs into probabilities for the 10 classes. The class with the highest probability is selected as the predicted digit.
+
+---
+
+## Training Settings
+
+The common training settings were:
+
+- Epochs: 30
 - Batch size: 32
-- Validation: 20% of the training data held out each epoch (`validation_split=0.2`)
-- Learning rate: each optimizer's Keras default (Adam/RMSprop = 0.001, SGD = 0.01)
+- Validation split: 20% of training data
+- Loss function: Sparse Categorical Crossentropy
+- Output activation: Softmax
+
+I used `sparse_categorical_crossentropy` because the target values are directly represented as integer labels from 0 to 9.
 
 ---
 
-## 6. Experiments
+# Experiment A - Activation Function Comparison
 
-The lab requires that we **do not just swap a setting and report accuracy**, so each experiment changes exactly one thing while holding everything else constant.
+In the first experiment, I compared three activation functions:
 
-- **Experiment A — Activation functions:** optimizer fixed at **Adam**, hidden-layer activation varied across **ReLU, Sigmoid, Tanh**.
-- **Experiment B — Optimizers:** activation fixed at **ReLU**, optimizer varied across **Adam, SGD, RMSprop**.
+1. ReLU
+2. Sigmoid
+3. Tanh
 
-(The "ReLU + Adam" model belongs to both experiments, so it is trained once and reused.)
+The optimizer was kept fixed as **Adam**.
 
----
+Therefore, the models were:
 
-## 7. Comparison Table (all metrics measured on the same 360-sample test set)
+    ReLU + Adam
+    Sigmoid + Adam
+    Tanh + Adam
 
-| Model | Activation | Optimizer | Test Accuracy | Precision | Recall | F1-score |
-|---|---|---|---|---|---|---|
-| Model 1 | ReLU | Adam | 0.972 | 0.973 | 0.972 | 0.971 |
-| Model 2 | Sigmoid | Adam | 0.964 | 0.965 | 0.964 | 0.963 |
-| **Model 3** | **Tanh** | **Adam** | **0.981** | **0.981** | **0.980** | **0.980** |
-| Model 4 | ReLU | SGD | 0.953 | 0.954 | 0.952 | 0.951 |
-| Model 5 | ReLU | RMSprop | 0.975 | 0.975 | 0.975 | 0.975 |
+Keeping Adam fixed makes it easier to observe the effect of changing only the activation function.
 
-*Precision, recall and F1 are **macro-averaged**.*
+### ReLU
 
-> Note: all five models perform well (95–98%) because digit recognition on this clean dataset is an easy task. The differences between the top models are small, so the numbers may shift slightly if you re-run, but the overall ranking and story stay the same.
+ReLU outputs zero for negative values and keeps positive values.
 
----
+It is widely used in neural networks because it is simple and generally allows fast training.
 
-## 8. Confusion Matrix Interpretation (best model: Tanh + Adam)
+### Sigmoid
 
-The best model misclassified only **7 of 360** test images. The mistakes were:
+Sigmoid converts values into a range between 0 and 1.
 
-| True digit | Predicted as | Count |
-|---|---|---|
-| 8 | 1 | 2 |
-| 8 | 2 | 1 |
-| 8 | 3 | 1 |
-| 7 | 4 | 2 |
-| 9 | 7 | 2 |
-| 1 | 0 | 1 |
+It can sometimes learn more slowly in hidden layers because its gradients can become very small.
 
-- **Most accurately predicted:** digits **0, 2, 3, 4, 5, 6** were classified perfectly (100%).
-- **Most frequently misclassified:** digit **8** (4 of its 35 test images were wrong — recall ≈ 0.89). It was spread across 1, 2 and 3.
-- **Hardest pairs to distinguish:** **8 vs 1**, **7 vs 4**, and **9 vs 7**.
+### Tanh
 
-**Why these confusions make sense:** at only 8×8 resolution, an 8 shares its two stacked loops with the curves of 2 and 3 and the vertical stroke of 1; a 7 and a 4 both have a prominent diagonal/horizontal stroke near the top; and 9 and 7 share an upper loop with a descending stroke. These are exactly the digits a *person* would also confuse in a blurry 8×8 image, so the errors reflect genuine visual overlap rather than a broken model.
+Tanh produces values between -1 and 1.
+
+Unlike Sigmoid, it is zero-centered. In this experiment, Tanh gave the best overall performance.
 
 ---
 
-## 9. Analysis and Interpretation (answers to the lab questions)
+# Experiment B - Optimizer Comparison
 
-1. **Which activation performed best? Why?** **Tanh** edged out the others (F1 0.980). Tanh is zero-centered and, on standardized inputs, tends to produce well-scaled gradients early in training. ReLU was a very close second (0.971).
-2. **Which optimizer performed best? Why?** **Adam** and **RMSprop** were best (0.971–0.975). Both adapt the learning rate per-parameter, so they converge quickly and reliably. Plain SGD was the weakest (0.951) because it uses a single fixed learning rate and needs more epochs/tuning to catch up.
-3. **Best activation + optimizer combination?** **Tanh + Adam** (test accuracy 0.981, F1 0.980).
-4. **Did the activation function significantly affect convergence?** Somewhat. ReLU and Tanh converged fast and smoothly; **Sigmoid was noticeably slower** to converge because its gradients saturate (get very small) when neuron outputs approach 0 or 1.
-5. **Did the optimizer affect convergence speed?** Yes, strongly. Adam and RMSprop reached high accuracy within the first ~10–15 epochs; **SGD improved more slowly** and was still catching up late in training.
-6. **Best validation performance?** The adaptive-optimizer models (Tanh+Adam and ReLU+RMSprop) had the highest, most stable validation curves.
-7. **Best test performance?** **Tanh + Adam** (0.981).
-8. **Significant gap between training and testing performance?** No. Training accuracy reached ~99–100% and test accuracy was ~97–98%, a small and healthy gap — the model generalizes well.
-9. **Overfitting or underfitting?** Only **mild overfitting** (training slightly above validation late in training) and no underfitting — all models learned the task. Sigmoid was the closest to underfitting early on due to slow convergence.
-10. **Which classes were most frequently misclassified?** Digit **8** (and to a lesser extent 7 and 9).
-11. **Possible reasons for these misclassifications?** Low 8×8 resolution and genuine shape overlap between 8/1/2/3, 7/4, and 9/7 (explained in Section 8).
-12. **What could improve performance?** Add regularization (Dropout) to reduce the small overfitting; train a bit longer with early stopping; try a slightly wider network; or, for a bigger jump, use a Convolutional Neural Network (CNN), which is designed for images and exploits pixel neighborhoods that an MLP ignores.
-13. **Which model would you select as the final model, and why?** See Section 10.
+In the second experiment, I compared:
 
-**How the dataset's characteristics influenced the MLP** (required discussion): the **10 balanced classes** meant macro-averaged metrics were appropriate and no imbalance handling was needed; the **64 continuous pixel features** made feature scaling important for stable training; the **non-linearity** of digit shapes is why hidden layers with non-linear activations are needed at all; and the main source of error was **overlapping classes** (visually similar digits) rather than noise or too few samples, which is exactly what the confusion matrix revealed.
+1. Adam
+2. SGD
+3. RMSprop
 
----
+For this experiment, the hidden-layer activation function was kept fixed as **ReLU**.
 
-## 10. Final Model Selection
+Therefore, the models were:
 
-**Selected final model: Tanh activation + Adam optimizer.**
+    ReLU + Adam
+    ReLU + SGD
+    ReLU + RMSprop
 
-Justification (considering more than accuracy):
+The ReLU + Adam model was already trained in Experiment A, so it was reused instead of training the same model again.
 
-- **Highest test accuracy and F1** (0.981 / 0.980) among all five models.
-- **Balanced precision and recall** across classes — no single digit is badly neglected.
-- **Stable, fast convergence** with only mild overfitting on the learning curves.
-- **Reasonable complexity** — the same small two-hidden-layer network as every other model, so it is not winning by being bigger; it simply pairs a well-scaled activation with an adaptive optimizer.
+### Adam
 
-ReLU + Adam is an equally defensible choice given how close the numbers are; Tanh + Adam is selected because it was best on every headline metric in this run while generalizing just as cleanly.
+Adam automatically adjusts the learning process for individual parameters and usually provides fast convergence.
 
----
+### SGD
 
-## 11. Conclusion
+Stochastic Gradient Descent updates the model parameters using the gradient of the loss.
 
-A simple two-hidden-layer MLP classifies the 10 handwritten digits with about **98% test accuracy**. Comparing activations showed Tanh and ReLU clearly outperform Sigmoid (whose gradients saturate), and comparing optimizers showed the adaptive methods (Adam, RMSprop) converge faster and score higher than plain SGD. The remaining errors come almost entirely from visually similar digits at low resolution (notably 8 vs 1/2/3), which points to a CNN as the natural next step for further gains.
+It is simple, but it can require more training or tuning compared with adaptive optimizers.
+
+### RMSprop
+
+RMSprop also adapts the learning rate during training and generally performs well for neural networks.
 
 ---
 
-### How to run
+# Results
+
+All five models were evaluated on the **same 360 unseen test samples**.
+
+Macro averaging was used for Precision, Recall and F1-score because this is a multiclass classification problem and the classes are almost balanced.
+
+## Comparison Table
+
+| Model | Test Accuracy | Precision | Recall | F1-Score |
+|---|---:|---:|---:|---:|
+| ReLU + Adam | 97.22% | 0.9733 | 0.9717 | 0.9713 |
+| Sigmoid + Adam | 95.56% | 0.9590 | 0.9551 | 0.9552 |
+| **Tanh + Adam** | **98.89%** | **0.9893** | **0.9887** | **0.9887** |
+| ReLU + SGD | 95.56% | 0.9581 | 0.9550 | 0.9546 |
+| ReLU + RMSprop | 97.22% | 0.9738 | 0.9717 | 0.9717 |
+
+---
+
+# Best Model
+
+The best-performing model was:
+
+**Tanh + Adam**
+
+Its results were:
+
+    Test Accuracy = 98.89%
+    Precision     = 0.9893
+    Recall        = 0.9887
+    F1-Score      = 0.9887
+
+This model gave the highest overall performance among the five models tested.
+
+---
+
+# Confusion Matrix
+
+The confusion matrix obtained for the best model, Tanh + Adam, was:
+
+    [[36  0  0  0  0  0  0  0  0  0]
+     [ 0 35  0  0  0  0  1  0  0  0]
+     [ 0  0 35  0  0  0  0  0  0  0]
+     [ 0  0  0 37  0  0  0  0  0  0]
+     [ 0  0  0  0 36  0  0  0  0  0]
+     [ 0  0  0  0  0 37  0  0  0  0]
+     [ 0  0  0  0  0  0 36  0  0  0]
+     [ 0  0  0  0  0  0  0 36  0  0]
+     [ 0  2  0  1  0  0  0  0 32  0]
+     [ 0  0  0  0  0  0  0  0  0 36]]
+
+Out of 360 test images, only **4 images were incorrectly classified**.
+
+Therefore:
+
+    Correct predictions = 356
+    Wrong predictions   = 4
+
+This gives:
+
+    356 / 360 = 98.89% accuracy
+
+---
+
+## Confusion Matrix Observation
+
+The model classified most digits perfectly.
+
+Digits:
+
+    0, 2, 3, 4, 5, 6, 7 and 9
+
+were classified correctly for every test sample.
+
+Digit **1** was classified correctly 35 times, while one image of digit 1 was predicted as digit 6.
+
+Digit **8** had the highest number of mistakes.
+
+Out of 35 test images of digit 8:
+
+- 32 were correctly predicted as 8
+- 2 were predicted as 1
+- 1 was predicted as 3
+
+Therefore, **digit 8 was the most frequently misclassified class**.
+
+This may happen because handwritten digits can have similar shapes. At a low resolution of only 8 x 8 pixels, some handwritten 8s may contain strokes that look similar to 1 or 3.
+
+---
+
+# Learning Curves
+
+The program generated graphs to compare the models during training.
+
+### Activation Comparison
+
+File:
+
+    activation_comparison.png
+
+This graph compares the validation accuracy of:
+
+- ReLU + Adam
+- Sigmoid + Adam
+- Tanh + Adam
+
+It helps us understand how changing the hidden-layer activation function affects learning.
+
+### Optimizer Comparison
+
+File:
+
+    optimizer_comparison.png
+
+This compares:
+
+- ReLU + Adam
+- ReLU + SGD
+- ReLU + RMSprop
+
+It helps us compare the convergence of different optimizers.
+
+### Best Model Accuracy
+
+File:
+
+    best_model_accuracy.png
+
+This compares the training and validation accuracy of the final selected model.
+
+### Best Model Loss
+
+File:
+
+    best_model_loss.png
+
+This compares training and validation loss and can be used to check whether the model is learning properly or showing overfitting.
+
+---
+
+# Observation
+
+All five MLP models were able to learn the handwritten-digit classification problem well, with test accuracies above 95%.
+
+Changing the activation function affected the final performance.
+
+With Adam fixed as the optimizer:
+
+    ReLU    = 97.22%
+    Sigmoid = 95.56%
+    Tanh    = 98.89%
+
+Tanh gave the best result in this experiment.
+
+Changing the optimizer also affected performance.
+
+With ReLU fixed as the activation:
+
+    Adam    = 97.22%
+    SGD     = 95.56%
+    RMSprop = 97.22%
+
+Adam and RMSprop performed better than SGD in this run.
+
+The best overall combination was **Tanh + Adam**, which achieved **98.89% test accuracy**.
+
+The confusion matrix also showed that the model generalized well because it made only 4 incorrect predictions out of 360 unseen test images.
+
+---
+
+# Analysis and Interpretation
+
+## 1. Which activation function performed best? Why?
+
+**Tanh performed best** in this experiment.
+
+With Adam as the common optimizer:
+
+- ReLU achieved 97.22% accuracy.
+- Sigmoid achieved 95.56% accuracy.
+- Tanh achieved 98.89% accuracy.
+
+Tanh is zero-centered and worked well with the standardized input features in this dataset.
+
+---
+
+## 2. Which optimizer performed best? Why?
+
+For the ReLU models, **Adam and RMSprop both achieved 97.22% test accuracy**.
+
+RMSprop had a slightly higher F1-score:
+
+    Adam F1    = 0.9713
+    RMSprop F1 = 0.9717
+
+Both performed better than SGD, which achieved 95.56% accuracy.
+
+Adam and RMSprop adapt their updates during training, which can help them converge efficiently.
+
+---
+
+## 3. Which activation-function and optimizer combination gave the best performance?
+
+The best combination was:
+
+**Tanh + Adam**
+
+It achieved:
+
+- Test Accuracy: 98.89%
+- Precision: 0.9893
+- Recall: 0.9887
+- F1-score: 0.9887
+
+---
+
+## 4. Did activation function affect convergence?
+
+Yes.
+
+The activation comparison graph shows that the models do not learn in exactly the same way.
+
+ReLU and Tanh performed better than Sigmoid in the final test results.
+
+Sigmoid can suffer from very small gradients when its values become saturated, which can make learning slower.
+
+---
+
+## 5. Did optimizer affect convergence speed?
+
+Yes.
+
+Adam and RMSprop are adaptive optimizers and generally reached good performance efficiently.
+
+SGD produced the lowest test performance among the three ReLU models in this experiment.
+
+---
+
+## 6. Which model achieved the best validation performance?
+
+The validation curves generated during training can be compared using `activation_comparison.png`, `optimizer_comparison.png`, and the best-model graphs.
+
+The final model selected from the complete evaluation was **Tanh + Adam**.
+
+---
+
+## 7. Which model achieved the best test performance?
+
+**Tanh + Adam** achieved the best test performance with **98.89% accuracy**.
+
+---
+
+## 8. Is there a significant difference between training and testing performance?
+
+The test performance of the selected model is very high at 98.89%.
+
+The training and validation curves should be viewed together with the test result to check the gap between them. A very large gap would suggest poor generalization, while similar performance indicates that the model generalizes well.
+
+---
+
+## 9. Does the model show overfitting or underfitting?
+
+The generated training and validation curves are used to check this.
+
+Overfitting would occur if training performance keeps improving while validation performance becomes worse.
+
+Underfitting would occur if both training and validation performance remain poor.
+
+The strong validation/test performance obtained in this experiment indicates that the selected MLP learned the digit classification task well.
+
+---
+
+## 10. Which class was most frequently misclassified?
+
+Digit **8** was the most frequently misclassified class.
+
+Three images of digit 8 were incorrectly classified:
+
+- Two as digit 1
+- One as digit 3
+
+---
+
+## 11. Why did these misclassifications occur?
+
+The Digits dataset contains very small 8 x 8 grayscale images.
+
+Different people write digits differently, and at such a low resolution some digits can have similar shapes.
+
+For example, parts of a handwritten 8 may resemble the strokes of a 1 or 3.
+
+---
+
+## 12. What could improve the classification performance?
+
+Possible improvements include:
+
+- Training for more epochs if required
+- Trying different learning rates
+- Adding Dropout if overfitting occurs
+- Changing the number of hidden neurons
+- Using a larger handwritten-digit dataset
+- Using a CNN instead of an MLP
+
+A CNN can be especially useful for image data because it can learn spatial patterns between nearby pixels.
+
+---
+
+## 13. Which model should be selected as the final model?
+
+I would select **Tanh + Adam**.
+
+It achieved the highest:
+
+- Test accuracy
+- Precision
+- Recall
+- F1-score
+
+It also made only 4 mistakes out of 360 test samples.
+
+Therefore, it provided the best overall classification performance among the models tested.
+
+---
+
+# Effect of Dataset Characteristics
+
+The characteristics of the dataset also affect the MLP.
+
+### Number of Classes
+
+There are 10 classes, so this is a multiclass classification problem.
+
+Therefore, 10 output neurons with Softmax activation are used.
+
+### Class Balance
+
+The classes are almost equally distributed, so no class balancing technique was required.
+
+### Feature Distribution
+
+The input consists of 64 pixel intensity features.
+
+StandardScaler was used to put the features on a suitable scale before training.
+
+### Non-Linearity
+
+Handwritten digits cannot be separated using only simple linear boundaries.
+
+Hidden layers with nonlinear activation functions such as ReLU, Sigmoid and Tanh help the MLP learn more complex patterns.
+
+### Overlapping Classes
+
+Some handwritten digits can look similar, especially at the low 8 x 8 resolution.
+
+This is visible in the confusion matrix, particularly for digit 8.
+
+### Number of Samples
+
+The dataset contains 1797 samples.
+
+This is enough to train a small MLP for this practical while also keeping the training time low.
+
+---
+
+# Files Generated
+
+The program generated the following files:
+
+1. `confusion_matrix.png`
+2. `activation_comparison.png`
+3. `optimizer_comparison.png`
+4. `best_model_accuracy.png`
+5. `best_model_loss.png`
+
+These graphs are useful for comparing the models and understanding their performance.
+
+---
+
+# Final Result
+
+The MLP was successfully implemented for handwritten-digit multiclass classification.
+
+Five different model configurations were compared.
+
+The best model was:
+
+**Tanh Activation + Adam Optimizer**
+
+Final performance:
+
+    Test Accuracy = 98.89%
+    Precision     = 0.9893
+    Recall        = 0.9887
+    F1-Score      = 0.9887
+
+Only **4 out of 360 test images were incorrectly classified**.
+
+---
+
+# Conclusion
+
+In this practical, I implemented a Multi-Layer Perceptron using TensorFlow/Keras for handwritten-digit multiclass classification.
+
+I compared three activation functions - ReLU, Sigmoid and Tanh - and three optimizers - Adam, SGD and RMSprop.
+
+From the experiment, **Tanh + Adam gave the best overall result with 98.89% test accuracy**.
+
+I also learned how accuracy, precision, recall, F1-score, confusion matrices and learning curves can be used together to evaluate a multiclass classification model instead of looking only at accuracy.
+
+This practical helped me understand that the choice of activation function and optimizer can affect both the learning process and the final performance of an MLP.
